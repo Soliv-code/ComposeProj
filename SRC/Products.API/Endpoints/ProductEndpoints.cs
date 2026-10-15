@@ -95,7 +95,7 @@ public static class ProductEndpoints
         .WithName("GetProductsPaginated")                                       // Имя операции (для генерации клиентов)
         .WithDescription("Возвращает список товаров с поддержкой пагинации")    // Описание для Swagger
         .WithTags("Products");                                                  // Группировка в Swagger UI
-        
+         
         // GET /products/{id} — один товар по UUID
         app.MapGet("/products/{id:guid}", async(
             ApplicationDbContext ctx,
