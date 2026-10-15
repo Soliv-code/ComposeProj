@@ -27,6 +27,6 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();   // рисует UI на /swagger
 }
 app.MapProductEndpoints();
-app.UseHttpsRedirection();
+// app.UseHttpsRedirection(); Для ебаного docker-compose!
  
 app.Run();
