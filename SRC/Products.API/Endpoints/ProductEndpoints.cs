@@ -1,8 +1,9 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using Products.API.Database;
 using Products.API.Entities;
 using Products.API.Entities.DTOs;
-using System.Runtime.CompilerServices;
+using System.Globalization;
 
 namespace Products.API.Endpoints;
 
@@ -13,39 +14,65 @@ public static class ProductEndpoints
 
     public static void MapProductEndpoints(this IEndpointRouteBuilder app)
     {
-        /*
-        app.MapGet("/products", async (ApplicationDbContext context, CancellationToken ct) =>
-        {
-            var products = await context.Products
-                .AsNoTracking()
-                .ToListAsync(ct);
-
-            return Results.Ok(products);
-        });
-        */
-
         // GET /products?page=1&pageSize=10 — пагинация
         app.MapGet("/products", async (
             ApplicationDbContext ctx, 
             CancellationToken ct, 
             int page = 1, 
-            int pageSize = 10) =>
+            int pageSize = 10,
+            string sortBy = "createdAt",
+            string sortOrder = "desc",
+            string? search = null,
+            decimal? minPrice = null,
+            decimal? maxPrice = null) =>
         {
             // Валидация входных параметров 
             if(page < 1) page = 1;
             if (pageSize < 1 || pageSize > 100)  pageSize = 10;
 
-            var totalCount = await ctx.Products.CountAsync(ct);
+            // Базовый запрос
+            IQueryable<Product> query = ctx.Products.AsNoTracking();
 
-            var products = await ctx.Products
-                .AsNoTracking()
-                .OrderBy(p => p.CreatedAt)     // Стабильная сортировка для пагинации
-                .ThenBy(p => p.Id)             // На случай одинакового created_at
+            // 1. Применяем ФИЛЬТРЫ (до пагинации и сортировки!)
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                var searchLower = search.ToLower();
+                query = query.Where(p => p.Name.ToLower().Contains(searchLower));
+            }
+
+            if (minPrice.HasValue)
+            {
+                query = query.Where(p => p.Price >= minPrice.Value);
+            }
+
+            if (maxPrice.HasValue)
+            {
+                query = query.Where(p => p.Price <= maxPrice.Value);
+            }
+
+            // 2. Считаем общее количество (с учётом фильтров)
+            var totalCount = await query.CountAsync(ct);
+
+
+            // 3. Применяем сортировку
+            query = (sortBy.ToLower(), sortOrder.ToLower()) switch
+            {
+                ("id", "asc") => query.OrderBy(p => p.Id),
+                ("id", "desc") => query.OrderByDescending(p => p.Id),
+                ("price", "asc") => query.OrderBy(p => p.Price),
+                ("price", "desc") => query.OrderByDescending(p => p.Price),
+                ("createdat", "asc") => query.OrderBy(p => p.CreatedAt),
+                ("createdat", "desc") => query.OrderByDescending(p => p.CreatedAt),
+                _ => query.OrderByDescending(p => p.CreatedAt)
+            };
+
+            // 4. Применяем пагинацию
+            var products = await query
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
-                .ToListAsync();
+                .ToListAsync(ct);
 
-            // Конвертируем в московское время
+            // 5. Формируем ответ
             var response = products.Select(p => new ProductResponseDto(
                 p.Id,
                 p.Name,
@@ -57,13 +84,12 @@ public static class ProductEndpoints
 
             return Results.Ok(new
             {
-                data = products,
+                data = response,
                 page,
                 pageSize,
                 totalCount,
                 totalPages = (int)Math.Ceiling(totalCount / (double)pageSize)
             });
-
         })
         // Новые стандарты .NET 10!
         .WithName("GetProductsPaginated")                                       // Имя операции (для генерации клиентов)
