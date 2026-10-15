@@ -127,7 +127,7 @@ public static class ProductEndpoints
         .WithDescription("Возвращает конкретный товар по его UUID")
         .WithTags("Products")
         .ProducesProblem(404);                     // Товар с таким ID не найден (404 Not Found)
-
+         
         // POST /products
         app.MapPost("/products", async (
             ApplicationDbContext ctx,
