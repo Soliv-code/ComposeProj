@@ -5,7 +5,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 namespace Products.API.Entities;
 
 [Table("products")]
-public class Products
+public class Product
 {
     [Key]
     [Column("id")]

@@ -1,28 +1,25 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Products.API.Entities;
 
-
 namespace Products.API.Database;
 
 public class ApplicationDbContext : DbContext
 {
-    public ApplicationDbContext(DbContextOptions<ApplicationDbContext> opt) : base(opt)
+    public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : base(options)
     {
     }
 
-    public DbSet<Entities.Products> Products { get; }
+    // ВАЖНО: добавлен set; и тип теперь Product (единственное число)
+    public DbSet<Product> Products { get; set; } = null!;
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        modelBuilder.Entity<Entities.Products>(entity =>
+        modelBuilder.Entity<Product>(entity =>
         {
             entity.ToTable("products");
-
             entity.HasKey(e => e.Id);
 
-            entity.Property(e => e.Id)
-                .HasColumnName("id")
-                .ValueGeneratedOnAdd();
+            entity.Property(e => e.Id).HasColumnName("id");
 
             entity.Property(e => e.Name)
                 .HasColumnName("name")
@@ -38,13 +35,10 @@ public class ApplicationDbContext : DbContext
                 .HasColumnName("description");
 
             entity.Property(e => e.CreatedAt)
-                .HasColumnName("created_at")
-                .ValueGeneratedOnAdd();
+                .HasColumnName("created_at");
 
             entity.Property(e => e.UpdatedAt)
-                .HasColumnName("updated_at")
-                .ValueGeneratedOnAddOrUpdate();
+                .HasColumnName("updated_at");
         });
     }
-
 }
