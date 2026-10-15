@@ -4,10 +4,18 @@ using Products.API.Endpoints;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddDbContext<ApplicationDbContext>(opt =>
-    opt.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+builder.Services.AddDbContext<ApplicationDbContext>(opt => 
+{
+    opt.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection"));
+    // Включаем логирование значений параметров (только для Development!)
+    if (builder.Environment.IsDevelopment())
+    {
+        opt.EnableSensitiveDataLogging();
+        opt.EnableDetailedErrors();        // Бонусом — больше деталей об ошибках
+    }
+});
+    
 
-//builder.Services.AddOpenApi();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
