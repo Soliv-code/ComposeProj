@@ -1,11 +1,11 @@
 services:
-  postgres:
+  products_postgres:
     image: pgvector/pgvector:pg17
     container_name: products_postgres
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: products_db
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
     ports:
       - "5432:5432"
     volumes:
@@ -13,10 +13,26 @@ services:
       - ./SQL:/docker-entrypoint-initdb.d
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d products_db"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 10s
       timeout: 5s
       retries: 5
+
+  products_api:
+    build:
+      context: .. # Поднимаемся на уровень выше, чтобы видеть папку SRC
+      dockerfile: SRC/Products.API/Dockerfile
+    container_name: products_api
+    environment:
+      - ASPNETCORE_ENVIRONMENT=${ASPNETCORE_ENVIRONMENT}
+      - ASPNETCORE_URLS=${ASPNETCORE_URLS}
+      - ConnectionStrings__DefaultConnection=${CONNECTION_STRING}
+    ports:
+      - "5000:8080" # Внешний порт 5000, внутренний 8080
+    depends_on:
+      products_postgres:
+        condition: service_healthy # Ждём полной готовности БД
+    restart: unless-stopped
 
 volumes:
   postgres_data:
