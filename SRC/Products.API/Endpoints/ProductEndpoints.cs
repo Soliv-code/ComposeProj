@@ -1,9 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
-using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using Products.API.Database;
 using Products.API.Entities;
 using Products.API.Entities.DTOs;
-using System.Globalization;
 
 namespace Products.API.Endpoints;
 
@@ -166,7 +164,7 @@ public static class ProductEndpoints
         .ProducesValidationProblem(400);           // Указываем, что может быть ошибка валидации
 
         // PUT /products
-        app.MapPut("/products", async (
+        app.MapPut("/products/{id:guid}", async (
             ApplicationDbContext ctx,
             Guid id,
             UpdateProductDto dto,
@@ -185,6 +183,7 @@ public static class ProductEndpoints
             product.Name = dto.Name;
             product.Price = dto.Price;
             product.Description = dto.Description;
+            product.UpdatedAt = DateTime.UtcNow;
 
             // 3. Сохраняем изменения
             await ctx.SaveChangesAsync(ct);

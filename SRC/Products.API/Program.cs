@@ -6,7 +6,16 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddDbContext<ApplicationDbContext>(opt => 
 {
-    opt.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection"));
+    opt.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection"), npgsqlOptions => 
+    {
+        // 🛡️ МАГИЯ: Автоматические повторные попытки при временных сбоях сети/старта БД
+        npgsqlOptions.EnableRetryOnFailure(
+        maxRetryCount: 5,                // Максимум 5 попыток
+        maxRetryDelay: TimeSpan.FromSeconds(10), // Пауза между попытками
+        errorCodesToAdd: null);          // null = использовать стандартные коды ошибок PostgreSQL
+
+    });
+
     // Включаем логирование значений параметров (только для Development!)
     if (builder.Environment.IsDevelopment())
     {
@@ -24,7 +33,7 @@ var app = builder.Build();
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();     // отдаёт /swagger/v1/swagger.json
-    app.UseSwaggerUI();   // рисует UI на /swagger
+    app.UseSwaggerUI();
 }
 app.MapProductEndpoints();
 // app.UseHttpsRedirection(); Для ебаного docker-compose!

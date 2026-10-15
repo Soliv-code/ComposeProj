@@ -1,6 +1,6 @@
 <Solution>
   <Folder Name="/Docker/">
-    <File Path=".env" />
+    <File Path="Docker/.env" />
     <File Path="Docker/docker-compose.yml" />
   </Folder>
   <Folder Name="/Docker/SQL/">
@@ -10,4 +10,7 @@
   <Folder Name="/Src/">
     <Project Path="SRC/Products.API/Products.API.csproj" />
   </Folder>
+  <Project Path="docker-compose.dcproj">
+    <Build />
+  </Project>
 </Solution>
