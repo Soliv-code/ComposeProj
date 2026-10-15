@@ -1,0 +1,12 @@
+<Solution>
+  <Folder Name="/Docker/">
+    <File Path="Docker/docker-compose.yml" />
+  </Folder>
+  <Folder Name="/Docker/SQL/">
+    <File Path="Docker/SQL/01-init.sql" />
+    <File Path="Docker/SQL/02-seed.sql" />
+  </Folder>
+  <Folder Name="/Src/">
+    <Project Path="SRC/Products.API/Products.API.csproj" />
+  </Folder>
+</Solution>
