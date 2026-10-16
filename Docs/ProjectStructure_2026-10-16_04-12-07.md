@@ -1,9 +1,8 @@
 ﻿```text
 ├── Docker
-│   ├── SQL
-│   │   ├── 01-init.sql
-│   │   └── 02-seed.sql
-│   └── .env
+│   └── SQL
+│       ├── 01-init.sql
+│       └── 02-seed.sql
 ├── Docs
 ├── SRC
 │   └── Products.API
@@ -22,7 +21,6 @@
 │       ├── appsettings.Development.json
 │       ├── appsettings.json
 │       ├── Dockerfile
-│       ├── Dockerfile.original
 │       ├── Products.API.csproj
 │       ├── Products.API.http
 │       └── Program.cs
@@ -34,5 +32,6 @@
 ├── docker-compose.dcproj
 ├── docker-compose.override.yml
 ├── docker-compose.yml
-└── launchSettings.json
+├── launchSettings.json
+└── Readme.md
 ```
