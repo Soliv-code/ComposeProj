@@ -19,7 +19,7 @@
 - **ORM**: Entity Framework Core (Npgsql)
 - **Database**: PostgreSQL 17 (образ `pgvector/pgvector`)
 - **Containerization**: Docker, Docker Compose
-- **IDE**: Visual Studio 2022 (Container Orchestration)
+- **IDE**: Visual Studio 2026 (Container Orchestration)
 
 ##  Структура проекта
 
@@ -41,7 +41,7 @@
 
 ### Предварительные требования
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/)
-- [Visual Studio 2022](https://visualstudio.microsoft.com/) (или .NET SDK + Docker CLI)
+- [Visual Studio 2026](https://visualstudio.microsoft.com/) (или .NET SDK + Docker CLI)
 
 ### Шаг 1: Настройка переменных окружения
 Убедитесь, что в корне проекта существует файл `.env`. Если его нет, создайте его на основе следующего шаблона:
