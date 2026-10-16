@@ -1,8 +1,5 @@
 <Solution>
-  <Folder Name="/Docker/">
-    <File Path="Docker/.env" />
-    <File Path="Docker/docker-compose.yml" />
-  </Folder>
+  <Folder Name="/Docker/" />
   <Folder Name="/Docker/SQL/">
     <File Path="Docker/SQL/01-init.sql" />
     <File Path="Docker/SQL/02-seed.sql" />
