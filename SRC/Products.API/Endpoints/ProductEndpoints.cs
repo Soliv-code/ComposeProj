@@ -1,7 +1,10 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Distributed;
 using Products.API.Database;
 using Products.API.Entities;
 using Products.API.Entities.DTOs;
+using StackExchange.Redis;
+using System.Text.Json;
 
 namespace Products.API.Endpoints;
 
@@ -15,9 +18,10 @@ public static class ProductEndpoints
 
         // GET /products?page=1&pageSize=10 — пагинация
         app.MapGet("/products", async (
-            ApplicationDbContext ctx, 
-            CancellationToken ct, 
-            int page = 1, 
+            ApplicationDbContext ctx,
+            IDistributedCache cache,
+            CancellationToken ct,
+            int page = 1,
             int pageSize = 10,
             string sortBy = "createdAt",
             string sortOrder = "desc",
@@ -25,14 +29,28 @@ public static class ProductEndpoints
             decimal? minPrice = null,
             decimal? maxPrice = null) =>
         {
-            // Валидация входных параметров 
-            if(page < 1) page = 1;
-            if (pageSize < 1 || pageSize > 100)  pageSize = 10;
+            // 1. Валидация входных параметров 
+            if (page < 1) page = 1;
+            if (pageSize < 1 || pageSize > 100) pageSize = 10;
 
-            // Базовый запрос
+            // 2. ФОРМИРУЕМ УНИКАЛЬНЫЙ КЛЮЧ КЭША на основе ВСЕХ параметров, влияющих на результат
+            var cacheKey = $"products_list_p{page}_s{pageSize}_sort{sortBy}_{sortOrder}_q{search}_min{minPrice}_max{maxPrice}";
+
+            // 3. ПРОВЕРЯЕМ КЭШ (Cache Hit)
+            var cachedData = await cache.GetStringAsync(cacheKey, ct);
+            if (!string.IsNullOrEmpty(cachedData))
+            {
+                Console.WriteLine($"🚀 REDIS CACHE HIT! Ключ: {cacheKey}"); // Выводим в лог что данные взяли из кэша!
+                // Если данные есть в Redis — десериализуем и возвращаем мгновенно (1-3 мс)
+                var cachedResponse = JsonSerializer.Deserialize<ProductPageResponse>(cachedData);
+                return Results.Ok(cachedResponse);
+            }
+            Console.WriteLine($"💾 DB QUERY (Cache Miss). Ключ: {cacheKey}"); // Не нашли в кеше, идём в БД:
+
+            // 4. КЭШ ПУСТ (Cache Miss) — выполняем запрос к БД
             IQueryable<Product> query = ctx.Products.AsNoTracking();
 
-            // 1. Применяем ФИЛЬТРЫ (до пагинации и сортировки!)
+            // 4.1 Применяем ФИЛЬТРЫ (до пагинации и сортировки!)
             if (!string.IsNullOrWhiteSpace(search))
             {
                 var searchLower = search.ToLower();
@@ -49,11 +67,11 @@ public static class ProductEndpoints
                 query = query.Where(p => p.Price <= maxPrice.Value);
             }
 
-            // 2. Считаем общее количество (с учётом фильтров)
+            // 4.2 Считаем общее количество (с учётом фильтров)
             var totalCount = await query.CountAsync(ct);
 
 
-            // 3. Применяем сортировку
+            // 4.3 Применяем сортировку
             query = (sortBy.ToLower(), sortOrder.ToLower()) switch
             {
                 ("id", "asc") => query.OrderBy(p => p.Id),
@@ -65,7 +83,7 @@ public static class ProductEndpoints
                 _ => query.OrderByDescending(p => p.CreatedAt)
             };
 
-            // 4. Применяем пагинацию
+            // 4.4 Применяем пагинацию
             var products = await query
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
@@ -81,22 +99,32 @@ public static class ProductEndpoints
                 ConvertToMoscowTime(p.UpdatedAt)
             ));
 
-            return Results.Ok(new
+            // Собираем финальный объект через record (который теперь лежит в Entities)
+            var finalResponse = new ProductPageResponse(
+                Data: response,
+                Page: page,
+                PageSize: pageSize,
+                TotalCount: totalCount,
+                TotalPages: (int)Math.Ceiling(totalCount / (double)pageSize)
+            );
+
+            // 6. СОХРАНЯЕМ В REDIS на 5 минут (300 секунд)
+            var cacheOptions = new DistributedCacheEntryOptions
             {
-                data = response,
-                page,
-                pageSize,
-                totalCount,
-                totalPages = (int)Math.Ceiling(totalCount / (double)pageSize)
-            });
+                AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(5)
+            };
+
+            await cache.SetStringAsync(cacheKey, JsonSerializer.Serialize(finalResponse), cacheOptions, ct);
+
+            return Results.Ok(finalResponse);
         })
         // Новые стандарты .NET 10!
         .WithName("GetProductsPaginated")                                       // Имя операции (для генерации клиентов)
-        .WithDescription("Возвращает список товаров с поддержкой пагинации")    // Описание для Swagger
+        .WithDescription("Возвращает список товаров с поддержкой пагинации  и кэшированием в Redis")    // Описание для Swagger +
         .WithTags("Products");                                                  // Группировка в Swagger UI
-         
+
         // GET /products/{id} — один товар по UUID
-        app.MapGet("/products/{id:guid}", async(
+        app.MapGet("/products/{id:guid}", async (
             ApplicationDbContext ctx,
             Guid id,
             CancellationToken ct) =>
@@ -126,11 +154,12 @@ public static class ProductEndpoints
         .WithDescription("Возвращает конкретный товар по его UUID")
         .WithTags("Products")
         .ProducesProblem(404);                      // Товар с таким ID не найден (404 Not Found)
-         
+
         // POST /products
         app.MapPost("/products", async (
             ApplicationDbContext ctx,
             CreateProductDto dto,
+            IConnectionMultiplexer redis, // Внедряем прямой доступ к Redis
             CancellationToken ct) =>
         {
             var product = new Product
@@ -145,6 +174,26 @@ public static class ProductEndpoints
             ctx.Products.Add(product);
             await ctx.SaveChangesAsync(ct);
 
+            // МАГИЯ ОЧИСТКИ КЭША
+            var db = redis.GetDatabase();
+            var server = redis.GetServer(redis.GetEndPoints().First());
+
+            // 1. Находим ВСЕ ключи, которые начинаются с "ProductsAPI_products_list_"
+            var keys = server.Keys(pattern: "ProductsAPI_products_list_*");
+            // 2. Преобразуем в массив для пакетной обработки
+            var keysArray = keys.ToArray();
+            // 3. Если ключи есть, удаляем их ВСЕ ОДНИМ сетевым запросом!
+            if (keysArray.Length > 0)
+            {
+                // KeyDeleteAsync для массива возвращает реальное количество удаленных ключей (long)
+                var deletedCount = await db.KeyDeleteAsync(keysArray);
+                Console.WriteLine($"🧹 CACHE INVALIDATED! Удалено ключей кэша: {deletedCount}");
+            }
+            else
+            {
+                Console.WriteLine("🧹 Кэш списка был чист, удалять нечего.");
+            }
+
             // Возвращаем с московским временем
             var response = new ProductResponseDto(
                 product.Id,
@@ -156,10 +205,9 @@ public static class ProductEndpoints
             );
 
             return Results.Created($"/products/{product.Id}", response); // 201 + dto Response
-            //return Results.Created($"/products/{product.Id}", product); // 201 + наш product!
         })
         .WithName("CreateProduct")
-        .WithDescription("Создаёт новый товар")
+        .WithDescription("Создаёт новый товар и инвалидирует кэш списка")
         .WithTags("Products")
         .Produces<ProductResponseDto>(201)          // Явно указываем Swagger'у, что вернётся 201 и тип данных
         .ProducesValidationProblem(400);            // Указываем, что может быть ошибка валидации
@@ -169,6 +217,7 @@ public static class ProductEndpoints
             ApplicationDbContext ctx,
             Guid id,
             UpdateProductDto dto,
+            IConnectionMultiplexer redis, // Внедряем Redis
             CancellationToken ct) =>
         {
             // 1. Ищем существующий товар (FindAsync эффективнее, чем FirstOrDefault, для поиска по первичному ключу)
@@ -189,7 +238,18 @@ public static class ProductEndpoints
             // 3. Сохраняем изменения
             await ctx.SaveChangesAsync(ct);
 
-            // 4. Возвращаем обновленный объект с московским временем
+            // 4. 🧹 МАГИЯ ОЧИСТКИ КЭША (Такая же, как в POST) 🧹
+            var db = redis.GetDatabase();
+            var server = redis.GetServer(redis.GetEndPoints().First());
+            var keys = server.Keys(pattern: "ProductsAPI_products_list_*").ToArray();
+
+            if (keys.Length > 0)
+            {
+                var deletedCount = await db.KeyDeleteAsync(keys);
+                Console.WriteLine($"🧹 CACHE INVALIDATED (PUT)! Удалено ключей кэша: {deletedCount}");
+            }
+
+            // 5. Возвращаем обновленный объект с московским временем
 
             var response = new ProductResponseDto(
                 product.Id,
@@ -202,7 +262,7 @@ public static class ProductEndpoints
             return Results.Ok(response);
         })
         .WithName("UpdateProduct")
-        .WithDescription("Обновляет информацию о товаре по его ID")
+        .WithDescription("Обновляет товар и инвалидирует кэш списка")
         .WithTags("Products")
         .Produces<ProductResponseDto>(200)          // Успешное обновление (200 OK)
         .ProducesValidationProblem(400)             // Ошибка валидации DTO (400 Bad Request)
@@ -212,6 +272,7 @@ public static class ProductEndpoints
         app.MapDelete("/products/{id:guid}", async (
             ApplicationDbContext ctx,
             Guid id,
+            IConnectionMultiplexer redis,
             CancellationToken ct
             ) =>
         {
@@ -228,7 +289,18 @@ public static class ProductEndpoints
             // 3. Сохраняем изменения в БД
             await ctx.SaveChangesAsync(ct);
 
-            // 4. Возвращаем 204 No Content (стандарт для успешного DELETE)
+            // 🧹 МАГИЯ ОЧИСТКИ КЭША (Такая же, как в POST и PUT) 🧹
+            var db = redis.GetDatabase();
+            var server = redis.GetServer(redis.GetEndPoints().First());
+            var keys = server.Keys(pattern: "ProductsAPI_products_list_*").ToArray();
+
+            if (keys.Length > 0)
+            {
+                var deletedCount = await db.KeyDeleteAsync(keys);
+                Console.WriteLine($"🧹 CACHE INVALIDATED (DELETE)! Удалено ключей кэша: {deletedCount}");
+            }
+
+            // 5. Возвращаем 204 No Content (стандарт для успешного DELETE)
             return Results.NoContent();
 
         })

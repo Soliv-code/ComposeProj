@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Products.API.Database;
 using Products.API.Endpoints;
+using StackExchange.Redis;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -23,7 +24,19 @@ builder.Services.AddDbContext<ApplicationDbContext>(opt =>
         opt.EnableDetailedErrors();        // Бонусом — больше деталей об ошибках
     }
 });
-    
+
+// Подключаем Redis как распределенный кэш
+builder.Services.AddStackExchangeRedisCache(opt =>
+{
+    // "redis" - это имя сервиса из docker-compose.yml, 6379 - стандартный порт
+    opt.Configuration = "redis:6379";
+    // Префикс для всех ключей кэша, чтобы они не путались с другими приложениями, если они будут
+    opt.InstanceName = "ProductsAPI_";
+});
+
+// Регистрируем IConnectionMultiplexer, чтобы иметь полный контроль над Redis
+builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
+    ConnectionMultiplexer.Connect("redis:6379"));
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
