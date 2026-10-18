@@ -12,6 +12,7 @@ public static class ProductEndpoints
 
     public static void MapProductEndpoints(this IEndpointRouteBuilder app)
     {
+
         // GET /products?page=1&pageSize=10 — пагинация
         app.MapGet("/products", async (
             ApplicationDbContext ctx, 
@@ -124,7 +125,7 @@ public static class ProductEndpoints
         .WithName("GetProductById")
         .WithDescription("Возвращает конкретный товар по его UUID")
         .WithTags("Products")
-        .ProducesProblem(404);                     // Товар с таким ID не найден (404 Not Found)
+        .ProducesProblem(404);                      // Товар с таким ID не найден (404 Not Found)
          
         // POST /products
         app.MapPost("/products", async (
@@ -160,8 +161,8 @@ public static class ProductEndpoints
         .WithName("CreateProduct")
         .WithDescription("Создаёт новый товар")
         .WithTags("Products")
-        .Produces<ProductResponseDto>(201)         // Явно указываем Swagger'у, что вернётся 201 и тип данных
-        .ProducesValidationProblem(400);           // Указываем, что может быть ошибка валидации
+        .Produces<ProductResponseDto>(201)          // Явно указываем Swagger'у, что вернётся 201 и тип данных
+        .ProducesValidationProblem(400);            // Указываем, что может быть ошибка валидации
 
         // PUT /products
         app.MapPut("/products/{id:guid}", async (
@@ -203,9 +204,9 @@ public static class ProductEndpoints
         .WithName("UpdateProduct")
         .WithDescription("Обновляет информацию о товаре по его ID")
         .WithTags("Products")
-        .Produces<ProductResponseDto>(200)         // Успешное обновление (200 OK)
-        .ProducesValidationProblem(400)            // Ошибка валидации DTO (400 Bad Request)
-        .ProducesProblem(404);                     // Товар с таким ID не найден (404 Not Found)
+        .Produces<ProductResponseDto>(200)          // Успешное обновление (200 OK)
+        .ProducesValidationProblem(400)             // Ошибка валидации DTO (400 Bad Request)
+        .ProducesProblem(404);                      // Товар с таким ID не найден (404 Not Found)
 
         // DELETE /products/{id} — удаление товара
         app.MapDelete("/products/{id:guid}", async (
@@ -234,8 +235,8 @@ public static class ProductEndpoints
         .WithName("DeleteProduct")
         .WithDescription("Удаляет товар по его уникальному идентификатору")
         .WithTags("Products")
-        .Produces(204)               // Успешное удаление
-        .ProducesProblem(404);       // Товар не найден
+        .Produces(204)                              // Успешное удаление
+        .ProducesProblem(404);                      // Товар не найден
     }
 
     private static string ConvertToMoscowTime(DateTime utcTime)
