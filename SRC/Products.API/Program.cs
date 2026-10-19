@@ -11,9 +11,9 @@ builder.Services.AddDbContext<ApplicationDbContext>(opt =>
     {
         // 🛡️ МАГИЯ: Автоматические повторные попытки при временных сбоях сети/старта БД
         npgsqlOptions.EnableRetryOnFailure(
-        maxRetryCount: 5,                // Максимум 5 попыток
-        maxRetryDelay: TimeSpan.FromSeconds(10), // Пауза между попытками
-        errorCodesToAdd: null);          // null = использовать стандартные коды ошибок PostgreSQL
+        maxRetryCount: 5,                           // Максимум 5 попыток
+        maxRetryDelay: TimeSpan.FromSeconds(10),    // Пауза между попытками
+        errorCodesToAdd: null);                     // null = использовать стандартные коды ошибок PostgreSQL
 
     });
 
