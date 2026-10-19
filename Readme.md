@@ -45,19 +45,26 @@
 - [Visual Studio 2026](https://visualstudio.microsoft.com/) (или .NET SDK + Docker CLI)
 
 ### Шаг 1: Настройка переменных окружения
-Убедитесь, что в корне проекта существует файл `.env`. Если его нет, создайте его на основе следующего шаблона:
+Убедитесь, что в корне проекта существует файл `.env.example`, переименуйте его в `.env`. 
+Если его нет, создайте его на основе следующего шаблона:
+```
+# ==========================================
+# PostgreSQL Configuration
+# ==========================================
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=postgres
+POSTGRES_DB=products_db
 
-    # PostgreSQL
-    POSTGRES_USER=postgres
-    POSTGRES_PASSWORD=postgres
-    POSTGRES_DB=products_db
-
-    # Connection String для API
-    DB_HOST=products_postgres
-    DB_PORT=5432
-    DB_NAME=products_db
-    DB_USER=postgres
-    DB_PASSWORD=postgres
+# ==========================================
+# API Connection String Variables
+# (Используются в docker-compose.yml для сборки строки подключения)
+# ==========================================
+DB_HOST=products_postgres
+DB_PORT=5432
+DB_NAME=products_db
+DB_USER=postgres
+DB_PASSWORD=postgres
+```
 
 ### Шаг 2: Запуск
 
