@@ -32,7 +32,7 @@
     │       ├── Database/            # ApplicationDbContext
     │       ├── Endpoints/           # Minimal API маршруты
     │       ├── Entities/            # Сущности и DTOs
-    │       ── Program.cs           # Точка входа и настройка сервисов
+    │       ── Program.cs            # Точка входа и настройка сервисов
     ├── .env                         # Переменные окружения (не коммитится в Git)
     ├── .env.example                 # Пример переменных окружения
     ├── docker-compose.yml           # Основной файл оркестрации
