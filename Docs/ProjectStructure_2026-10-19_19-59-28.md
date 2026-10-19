@@ -13,9 +13,12 @@
 │       ├── Entities
 │       │   ├── DTOs
 │       │   │   ├── CreateProductDto.cs
+│       │   │   ├── ProductPageResponse.cs
 │       │   │   ├── ProductResponseDto.cs
 │       │   │   └── UpdateProductDto.cs
 │       │   └── Product.cs
+│       ├── Extensions
+│       │   └── RedisCacheExtensions.cs
 │       ├── Properties
 │       │   └── launchSettings.json
 │       ├── appsettings.Development.json
@@ -26,6 +29,7 @@
 │       └── Program.cs
 ├── .dockerignore
 ├── .env
+├── .env.example
 ├── .gitattributes
 ├── .gitignore
 ├── ComposeProj.slnx
