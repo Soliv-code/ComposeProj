@@ -25,6 +25,22 @@ builder.Services.AddDbContext<ApplicationDbContext>(opt =>
     }
 });
 
+// Читаем настройки Redis из конфигурации (appsettings.json или переменных окружения)
+var redisConnectionString = builder.Configuration.GetValue<string>("Redis:ConnectionString") ?? "redis:6379";
+var redisInstanceName = builder.Configuration.GetValue<string>("Redis:InstanceName") ?? "ProductsAPI_";
+
+// Подключаем Redis как распределенный кэш
+builder.Services.AddStackExchangeRedisCache(opt =>
+{
+    opt.Configuration = redisConnectionString;
+    opt.InstanceName = redisInstanceName;
+});
+
+// Регистрируем IConnectionMultiplexer для полного контроля (инвалидация кэша)
+builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
+    ConnectionMultiplexer.Connect(redisConnectionString));
+
+/*
 // Подключаем Redis как распределенный кэш
 builder.Services.AddStackExchangeRedisCache(opt =>
 {
@@ -37,7 +53,7 @@ builder.Services.AddStackExchangeRedisCache(opt =>
 // Регистрируем IConnectionMultiplexer, чтобы иметь полный контроль над Redis
 builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
     ConnectionMultiplexer.Connect("redis:6379"));
-
+*/
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 

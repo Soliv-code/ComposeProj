@@ -3,6 +3,7 @@ using Microsoft.Extensions.Caching.Distributed;
 using Products.API.Database;
 using Products.API.Entities;
 using Products.API.Entities.DTOs;
+using Products.API.Extensions;
 using StackExchange.Redis;
 using System.Text.Json;
 
@@ -183,6 +184,8 @@ public static class ProductEndpoints
             // 2. Преобразуем в массив для пакетной обработки
             var keysArray = keys.ToArray();
             // 3. Если ключи есть, удаляем их ВСЕ ОДНИМ сетевым запросом!
+            await redis.InvalidateProductsListCacheAsync();
+            /*
             if (keysArray.Length > 0)
             {
                 // KeyDeleteAsync для массива возвращает реальное количество удаленных ключей (long)
@@ -193,6 +196,7 @@ public static class ProductEndpoints
             {
                 Console.WriteLine("🧹 Кэш списка был чист, удалять нечего.");
             }
+            */
 
             // Возвращаем с московским временем
             var response = new ProductResponseDto(
@@ -242,12 +246,15 @@ public static class ProductEndpoints
             var db = redis.GetDatabase();
             var server = redis.GetServer(redis.GetEndPoints().First());
             var keys = server.Keys(pattern: "ProductsAPI_products_list_*").ToArray();
-
+            // Теперь это ещё более крутая магия :)
+            await redis.InvalidateProductsListCacheAsync();
+            /*
             if (keys.Length > 0)
             {
                 var deletedCount = await db.KeyDeleteAsync(keys);
                 Console.WriteLine($"🧹 CACHE INVALIDATED (PUT)! Удалено ключей кэша: {deletedCount}");
             }
+            */
 
             // 5. Возвращаем обновленный объект с московским временем
 
@@ -294,11 +301,14 @@ public static class ProductEndpoints
             var server = redis.GetServer(redis.GetEndPoints().First());
             var keys = server.Keys(pattern: "ProductsAPI_products_list_*").ToArray();
 
+            await redis.InvalidateProductsListCacheAsync();
+            /*
             if (keys.Length > 0)
             {
                 var deletedCount = await db.KeyDeleteAsync(keys);
                 Console.WriteLine($"🧹 CACHE INVALIDATED (DELETE)! Удалено ключей кэша: {deletedCount}");
             }
+            */
 
             // 5. Возвращаем 204 No Content (стандарт для успешного DELETE)
             return Results.NoContent();
