@@ -215,7 +215,7 @@ public static class ProductEndpoints
         .WithTags("Products")
         .Produces<ProductResponseDto>(201)          // Явно указываем Swagger'у, что вернётся 201 и тип данных
         .ProducesValidationProblem(400);            // Указываем, что может быть ошибка валидации
-
+         
         // PUT /products
         app.MapPut("/products/{id:guid}", async (
             ApplicationDbContext ctx,
