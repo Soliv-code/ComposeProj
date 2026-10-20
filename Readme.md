@@ -22,7 +22,7 @@
 - **IDE**: Visual Studio 2026 (Container Orchestration)
 
 ##  Структура проекта
-
+    ComposeProj/
     ├── Docker/
     │   └── SQL/                     # Скрипты инициализации и сидинга БД
     │       ├── 01-init.sql          # Создание таблиц и расширений
