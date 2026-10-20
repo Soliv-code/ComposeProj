@@ -5,13 +5,13 @@ using Serilog;
 using StackExchange.Redis;
 
 var builder = WebApplication.CreateBuilder(args);
-//======================================= Serilog block =======================================
+//======================================================== Serilog block ========================================================
 // Настраиваем Serilog: пишем и в консоль (для Docker), и в Seq
 builder.Host.UseSerilog((ctx, lc) => lc
     .WriteTo.Console(outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}{Exception}")
     .WriteTo.Seq("http://seq:5341")
     .MinimumLevel.Information());
-//=============================================================================================
+//===============================================================================================================================
 builder.Services.AddDbContext<ApplicationDbContext>(opt => 
 {
     opt.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection"), npgsqlOptions => 
@@ -27,11 +27,11 @@ builder.Services.AddDbContext<ApplicationDbContext>(opt =>
     // Включаем логирование значений параметров (только для Development!)
     if (builder.Environment.IsDevelopment())
     {
-        opt.EnableSensitiveDataLogging();  // Значение параметров для команд отправляемых в БД 
-        opt.EnableDetailedErrors();        // Больше деталей об ошибках
+        opt.EnableSensitiveDataLogging();   // Значение параметров для команд отправляемых в БД 
+        opt.EnableDetailedErrors();         // Больше деталей об ошибках
     }
 });
-//================================================== Redis block ===============================================================
+//======================================================== Redis block ==========================================================
 // Читаем настройки Redis из конфигурации (appsettings.json или переменных окружения)
 // Может возникнуть вопрос - а где указатель читать из .env ?
 // Магия .NET Configuration System:
@@ -56,7 +56,7 @@ builder.Services.AddStackExchangeRedisCache(opt =>
 // Регистрируем IConnectionMultiplexer для полного контроля (инвалидация кэша)
 builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
     ConnectionMultiplexer.Connect(redisConnectionString));
-//==============================================================================================================================
+//===============================================================================================================================
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
@@ -64,8 +64,8 @@ var app = builder.Build();
 
 if (app.Environment.IsDevelopment())
 {
-    app.UseSwagger();     // отдаёт /swagger/v1/swagger.json
-    app.UseSwaggerUI();
+    app.UseSwagger();   // отдаёт /swagger/v1/swagger.json
+    app.UseSwaggerUI(); // регистрируем SwaggerUI как middleware
 }
 app.MapProductEndpoints();
 // app.UseHttpsRedirection(); Для ебаного docker-compose!
