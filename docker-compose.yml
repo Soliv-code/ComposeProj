@@ -9,8 +9,11 @@ services:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_HTTP_PORTS=8080 # Явно указываем порт внутри контейнера
       # Используем переменные из .env
+      # ВАЖНО: двойное подчеркивание __ заменяется на :
       #- ConnectionStrings__DefaultConnection=Host=products_postgres;Port=5432;Database=products_db;Username=postgres;Password=postgres
       - ConnectionStrings__DefaultConnection=Host=${DB_HOST};Port=${DB_PORT};Database=${DB_NAME};Username=${DB_USER};Password=${DB_PASSWORD}
+      - Redis__ConnectionString=${REDIS_CONNECTION_STRING}
+      - Redis__InstanceName=${REDIS_INSTANCE_NAME}
     ports:
       - "5000:8080" # 🔥 ФИКСИРУЕМ ПОРТ: 5000 на твоей машине -> 8080 внутри контейнера
     depends_on:
