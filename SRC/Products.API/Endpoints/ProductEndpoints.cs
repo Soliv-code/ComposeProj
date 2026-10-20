@@ -40,6 +40,7 @@ public static class ProductEndpoints
 
             // 3. ПРОВЕРЯЕМ КЭШ (Cache Hit)
             var cachedData = await cache.GetStringAsync(cacheKey, ct);
+
             if (!string.IsNullOrEmpty(cachedData))
             {
                 //Console.WriteLine($"🚀 REDIS CACHE HIT! Ключ: {cacheKey}"); // Выводим в лог что данные взяли из кэша!
