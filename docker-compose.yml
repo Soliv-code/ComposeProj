@@ -45,5 +45,19 @@ services:
       - "6379:6379"
     restart: unless-stopped
 
+  seq:  # <-- Добавляем Seq для красивого структурированного логирования
+    image: datalust/seq:latest
+    container_name: products_seq
+    ports:
+      - "5341:5341"   # Порт для приема логов из приложения (Ingestion API)
+      - "8081:80"     # Порт для красивого UI в браузере
+    environment:
+      - ACCEPT_EULA=Y
+      - SEQ_FIRSTRUN_ADMINPASSWORD=${SEQ_ADMIN_PASSWORD} # 🔥 Читаем пароль из .env!
+    volumes:
+      - seq_data:/data  # Том остаётся здесь, так как это часть инфраструктуры
+    restart: unless-stopped
+
 volumes:
-  postgres_data:
+  postgres_data:  # Объявление тома для postgres
+  seq_data:       # Объявление тома для Seq

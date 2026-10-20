@@ -1,4 +1,5 @@
-﻿using StackExchange.Redis;
+﻿using Serilog;
+using StackExchange.Redis;
 
 namespace Products.API.Extensions;
 
@@ -17,11 +18,14 @@ public static class RedisCacheExtensions
         if (keys.Length > 0)
         {
             var deletedCount = await db.KeyDeleteAsync(keys);
-            Console.WriteLine($"🧹 CACHE INVALIDATED! Удалено ключей кэша: {deletedCount}");
+            // Т.к. подключили Serilog, переходим на логирование:
+            // Console.WriteLine($"🧹 CACHE INVALIDATED! Удалено ключей кэша: {deletedCount}");
+            Log.Information("🧹 CACHE INVALIDATED! Удалено ключей кэша: {DeletedCount}", deletedCount);
         }
         else
         {
-            Console.WriteLine("🧹 Кэш списка был чист, удалять нечего.");
+            //Console.WriteLine("🧹 Кэш списка был чист, удалять нечего.");
+            Log.Information("🧹 Кэш списка был чист, удалять нечего.");
         }
     }
 }

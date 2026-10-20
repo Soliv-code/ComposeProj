@@ -4,6 +4,7 @@ using Products.API.Database;
 using Products.API.Entities;
 using Products.API.Entities.DTOs;
 using Products.API.Extensions;
+using Serilog;
 using StackExchange.Redis;
 using System.Text.Json;
 
@@ -41,12 +42,14 @@ public static class ProductEndpoints
             var cachedData = await cache.GetStringAsync(cacheKey, ct);
             if (!string.IsNullOrEmpty(cachedData))
             {
-                Console.WriteLine($"🚀 REDIS CACHE HIT! Ключ: {cacheKey}"); // Выводим в лог что данные взяли из кэша!
+                //Console.WriteLine($"🚀 REDIS CACHE HIT! Ключ: {cacheKey}"); // Выводим в лог что данные взяли из кэша!
+                Log.Information($"🚀 REDIS CACHE HIT! Ключ: {cacheKey}");
                 // Если данные есть в Redis — десериализуем и возвращаем мгновенно (1-3 мс)
                 var cachedResponse = JsonSerializer.Deserialize<ProductPageResponse>(cachedData);
                 return Results.Ok(cachedResponse);
             }
-            Console.WriteLine($"💾 DB QUERY (Cache Miss). Ключ: {cacheKey}"); // Не нашли в кеше, идём в БД:
+            //Console.WriteLine($"💾 DB QUERY (Cache Miss). Ключ: {cacheKey}"); // Не нашли в кеше, идём в БД:
+            Log.Information($"💾 DB QUERY (Cache Miss). Ключ: {cacheKey}");
 
             // 4. КЭШ ПУСТ (Cache Miss) — выполняем запрос к БД
             IQueryable<Product> query = ctx.Products.AsNoTracking();

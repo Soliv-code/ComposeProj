@@ -1,10 +1,17 @@
 using Microsoft.EntityFrameworkCore;
 using Products.API.Database;
 using Products.API.Endpoints;
+using Serilog;
 using StackExchange.Redis;
 
 var builder = WebApplication.CreateBuilder(args);
-
+//======================================= Serilog block =======================================
+// Настраиваем Serilog: пишем и в консоль (для Docker), и в Seq
+builder.Host.UseSerilog((ctx, lc) => lc
+    .WriteTo.Console(outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}{Exception}")
+    .WriteTo.Seq("http://seq:5341")
+    .MinimumLevel.Information());
+//=============================================================================================
 builder.Services.AddDbContext<ApplicationDbContext>(opt => 
 {
     opt.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection"), npgsqlOptions => 
