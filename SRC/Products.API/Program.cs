@@ -44,9 +44,13 @@ builder.Services.AddDbContext<ApplicationDbContext>(opt =>
 var redisConnectionString = builder.Configuration.GetValue<string>("Redis:ConnectionString") ?? "redis:6379";
 var redisInstanceName = builder.Configuration.GetValue<string>("Redis:InstanceName") ?? "ProductsAPI_";
 */
+
+// `redis:6379` - Это сетевой адрес другого контейнера.
+// Нет внешнего адреса — некуда уезжать, остаёшься в своей памяти.
 var redisConnectionString = builder.Configuration["Redis:ConnectionString"] ?? "redis:6379";
 var redisInstanceName = builder.Configuration["Redis:InstanceName"] ?? "ProductsAPI_";
-// Подключаем Redis как распределенный кэш
+// Регистрирует реализацию IDistributedCache, которая хранит данные в Redis.
+// Это высокоуровневая абстракция: GetAsync / SetAsync / RemoveAsync по конкретному ключу.
 builder.Services.AddStackExchangeRedisCache(opt =>
 {
     opt.Configuration = redisConnectionString;
@@ -54,6 +58,8 @@ builder.Services.AddStackExchangeRedisCache(opt =>
 });
 
 // Регистрируем IConnectionMultiplexer для полного контроля (инвалидация кэша)
+// Прямой доступ к командам Redis: SCAN, KEYS, DEL, TTL. Нужен, чтобы удалять пачку ключей по паттерну.
+// У IDistributedCache такой возможности нет в принципе.
 builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
     ConnectionMultiplexer.Connect(redisConnectionString));
 //===============================================================================================================================
