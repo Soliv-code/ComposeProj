@@ -1,79 +1,109 @@
-using Microsoft.EntityFrameworkCore;
-using Products.API.Database;
+using Microsoft.OpenApi;
 using Products.API.Endpoints;
+using Products.API.Extensions;
 using Serilog;
-using StackExchange.Redis;
 
 var builder = WebApplication.CreateBuilder(args);
-//======================================================== Serilog block ========================================================
-// Настраиваем Serilog: пишем и в консоль (для Docker), и в Seq
+
+// ========================================================
+// 1. ЛОГИРОВАНИЕ
+// ========================================================
 builder.Host.UseSerilog((ctx, lc) => lc
     .WriteTo.Console(outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}{Exception}")
     .WriteTo.Seq("http://seq:5341")
     .MinimumLevel.Information());
-//===============================================================================================================================
-builder.Services.AddDbContext<ApplicationDbContext>(opt => 
-{
-    opt.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection"), npgsqlOptions => 
-    {
-        // Автоматические повторные попытки при временных сбоях сети/старта БД
-        npgsqlOptions.EnableRetryOnFailure(
-        maxRetryCount: 5,                           // Максимум 5 попыток
-        maxRetryDelay: TimeSpan.FromSeconds(10),    // Пауза между попытками
-        errorCodesToAdd: null);                     // null = использовать стандартные коды ошибок PostgreSQL
 
+// ========================================================
+// 2. РЕГИСТРАЦИЯ ЗАВИСИМОСТЕЙ (DI)
+// ========================================================
+builder.Services.AddDatabase(builder.Configuration, builder.Environment);
+builder.Services.AddRedisCache(builder.Configuration);
+builder.Services.AddKeycloakAuthentication(builder.Configuration);
+
+// ========================================================
+// 3. SWAGGER (ПРОСТОЙ И РАБОЧИЙ)
+// ========================================================
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen(c =>
+{
+    // 1. Определяем схему "Bearer" (тут всё осталось как было)
+    c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+    {
+        Name = "Authorization",
+        Type = SecuritySchemeType.Http,
+        Scheme = "bearer",
+        BearerFormat = "JWT",
+        In = ParameterLocation.Header,
+        Description = "Введите 'Bearer ' [пробел] и затем ваш JWT токен."
     });
 
-    // Включаем логирование значений параметров (только для Development!)
-    if (builder.Environment.IsDevelopment())
+    // 2. НОВЫЙ СИНТАКСИС ДЛЯ .NET 10 / SWASHBUCKLE 10.x
+    // Метод теперь принимает делегат (document => ...), а для ссылки используем OpenApiSecuritySchemeReference [[13]], [[15]]
+    c.AddSecurityRequirement(document => new OpenApiSecurityRequirement
     {
-        opt.EnableSensitiveDataLogging();   // Значение параметров для команд отправляемых в БД 
-        opt.EnableDetailedErrors();         // Больше деталей об ошибках
-    }
-});
-//======================================================== Redis block ==========================================================
-// Читаем настройки Redis из конфигурации (appsettings.json или переменных окружения)
-// Может возникнуть вопрос - а где указатель читать из .env ?
-// Магия .NET Configuration System:
-// .NET ищет это значение сразу в нескольких местах, в порядке возрастания приоритета:
-// 1. appsettings.json (низший приоритет)
-// 2. appsettings.Development.json
-// 3. Переменные окружения (Environment Variables) (высший приоритет для наших целей)
-// 4. Аргументы командной строки
-/*
-var redisConnectionString = builder.Configuration.GetValue<string>("Redis:ConnectionString") ?? "redis:6379";
-var redisInstanceName = builder.Configuration.GetValue<string>("Redis:InstanceName") ?? "ProductsAPI_";
-*/
-
-// `redis:6379` - Это сетевой адрес другого контейнера.
-// Нет внешнего адреса — некуда уезжать, остаёшься в своей памяти.
-var redisConnectionString = builder.Configuration["Redis:ConnectionString"] ?? "redis:6379";
-var redisInstanceName = builder.Configuration["Redis:InstanceName"] ?? "ProductsAPI_";
-// Регистрирует реализацию IDistributedCache, которая хранит данные в Redis.
-// Это высокоуровневая абстракция: GetAsync / SetAsync / RemoveAsync по конкретному ключу.
-builder.Services.AddStackExchangeRedisCache(opt =>
-{
-    opt.Configuration = redisConnectionString;
-    opt.InstanceName = redisInstanceName;
+        [new OpenApiSecuritySchemeReference("Bearer", document)] = new List<string>()
+    });
 });
 
-// Регистрируем IConnectionMultiplexer для полного контроля (инвалидация кэша)
-// Прямой доступ к командам Redis: SCAN, KEYS, DEL, TTL. Нужен, чтобы удалять пачку ключей по паттерну.
-// У IDistributedCache такой возможности нет в принципе.
-builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
-    ConnectionMultiplexer.Connect(redisConnectionString));
-//===============================================================================================================================
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
-
+// ========================================================
+// 4. HTTP-PIPELINE
+// ========================================================
 var app = builder.Build();
 
 if (app.Environment.IsDevelopment())
 {
-    app.UseSwagger();   // отдаёт /swagger/v1/swagger.json
-    app.UseSwaggerUI(); // регистрируем SwaggerUI как middleware
+    app.UseSwagger();
+    app.UseSwaggerUI();
 }
+
+app.UseAuthentication();
+app.UseAuthorization();
+
 app.MapProductEndpoints();
-// app.UseHttpsRedirection(); Для ебаного docker-compose!
- 
+
+// ========================================================
+// 5. DEV-ИНСТРУМЕНТЫ (Только для локальной разработки!)
+// ========================================================
+if (app.Environment.IsDevelopment())
+{
+    app.MapPost("/dev/get-token", async (IConfiguration config) =>
+    {
+        var clientSecret = config["Keycloak:ClientSecret"];
+        if (string.IsNullOrEmpty(clientSecret))
+        {
+            return Results.Problem("ClientSecret не настроен. Проверь .env (KEYCLOAK_CLIENT_SECRET)", statusCode: 500);
+        }
+
+        using var httpClient = new HttpClient();
+
+        // 👇 ИСПРАВЛЕНИЕ: Используем внутренний Docker-адрес для запроса, а не localhost!
+        var internalUrl = config["Keycloak:InternalUrl"] ?? "http://keycloak:8080/realms/products-realm";
+        var tokenUrl = $"{internalUrl}/protocol/openid-connect/token";
+
+        var requestContent = new FormUrlEncodedContent(new[]
+        {
+            new KeyValuePair<string, string>("grant_type", "password"),
+            new KeyValuePair<string, string>("client_id", "products-api"),
+            new KeyValuePair<string, string>("client_secret", clientSecret),
+            new KeyValuePair<string, string>("username", "testuser"),
+            new KeyValuePair<string, string>("password", "testpassword")
+        });
+
+        var response = await httpClient.PostAsync(tokenUrl, requestContent);
+
+        // Если Keycloak вернул ошибку (например, неверный пароль), пробросим её текст, а не 500
+        if (!response.IsSuccessStatusCode)
+        {
+            var errorText = await response.Content.ReadAsStringAsync();
+            return Results.Content(errorText, "application/json", statusCode: (int)response.StatusCode);
+        }
+
+        var jsonResponse = await response.Content.ReadAsStringAsync();
+        return Results.Content(jsonResponse, "application/json");
+    })
+    .WithTags("🛠 Dev Tools")
+    .WithSummary("Получить JWT токен для тестов")
+    .WithDescription("Обращается к Keycloak и возвращает access_token. Скопируйте значение 'access_token' из ответа и используйте его в кнопке 'Authorize' сверху. Работает только в режиме Development!");
+}
+
 app.Run();

@@ -124,9 +124,11 @@ public static class ProductEndpoints
             return Results.Ok(finalResponse);
         })
         // Новые стандарты .NET 10!
-        .WithName("GetProductsPaginated")                                       // Имя операции (для генерации клиентов)
+        .WithName("GetProductsPaginated")                                                               // Имя операции (для генерации клиентов)
         .WithDescription("Возвращает список товаров с поддержкой пагинации  и кэшированием в Redis")    // Описание для Swagger +
-        .WithTags("Products");                                                  // Группировка в Swagger UI
+        .WithTags("Products")                                                                           // Группировка в Swagger UI
+        .RequireAuthorization()                                                                         // Требуется авторизация!    
+        ;                                                                          
 
         // GET /products/{id} — один товар по UUID
         app.MapGet("/products/{id:guid}", async (
